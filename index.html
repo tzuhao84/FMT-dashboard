@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FMT Dashboard</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f4f4f2;
+  --surface-1: #fcfcfb;
+  --border: #e2e1dc;
+  --grid: #ecebe7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --series-1: #2a78d6;
+  --series-1-soft: #cde2fb;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-text: #006300;
+  --critical-text: #b02a2a;
+  --target: #7a7974;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2e2e2b;
+    --grid: #262624;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --series-1: #3987e5;
+    --series-1-soft: #184f95;
+    --good-text: #4cc94c;
+    --critical-text: #f08080;
+    --target: #8f8e86;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2e2e2b;
+  --grid: #262624;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --series-1: #3987e5;
+  --series-1-soft: #184f95;
+  --good-text: #4cc94c;
+  --critical-text: #f08080;
+  --target: #8f8e86;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font-size: 20px; margin: 0; }
+.sub { color: var(--text-secondary); font-size: 13px; }
+.controls {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 16px 0; padding: 10px 12px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+}
+.controls label { font-size: 12px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
+select, button, input[type="number"] {
+  font: inherit; font-size: 13px; color: var(--text-primary);
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 8px;
+}
+input[type="number"] { width: 64px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--text-muted); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; }
+.seg button[aria-pressed="true"] { background: var(--series-1); color: #fff; }
+.spacer { flex: 1; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.kpi .label { font-size: 12px; color: var(--text-secondary); }
+.kpi .value { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .note { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; margin-top: 12px; }
+.card h2 { font-size: 14px; margin: 0 0 2px; }
+.card .desc { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.axis text { fill: var(--text-muted); font-size: 11px; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 5;
+  background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px;
+  font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.15); white-space: nowrap;
+  opacity: 0; transition: opacity .08s;
+}
+.tip b { font-variant-numeric: tabular-nums; }
+.tip .muted { color: var(--text-secondary); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { font-weight: 600; color: var(--text-secondary); font-size: 12px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.pass { color: var(--good-text); font-weight: 600; }
+.fail { color: var(--critical-text); font-weight: 600; }
+.empty { color: var(--text-muted); padding: 24px 0; text-align: center; }
+details summary { cursor: pointer; font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+.drop { outline: 2px dashed var(--series-1); outline-offset: -6px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <div>
+      <h1>FMT Dashboard</h1>
+      <div class="sub" id="source">Sample data</div>
+    </div>
+    <div class="sub" id="range-label"></div>
+  </header>
+
+  <div class="controls" role="toolbar" aria-label="Filters">
+    <div class="seg" id="range" role="group" aria-label="Date range">
+      <button data-days="1">24h</button>
+      <button data-days="7" aria-pressed="true">7d</button>
+      <button data-days="30">30d</button>
+      <button data-days="0">All</button>
+    </div>
+    <label>Station <select id="f-station"></select></label>
+    <label>Product <select id="f-product"></select></label>
+    <label>FPY target % <input type="number" id="f-target" min="0" max="100" step="0.5" value="95"></label>
+    <span class="spacer"></span>
+    <input type="file" id="file" accept=".csv,text/csv" hidden>
+    <button id="btn-load" title="Load test records from a CSV file (or drop one on the page)">Load CSV</button>
+    <button id="btn-sample">Sample data</button>
+    <button id="btn-export">Export filtered</button>
+    <button id="btn-theme" title="Toggle light/dark">Theme</button>
+  </div>
+
+  <noscript><div class="card" style="margin-bottom:12px"><b>JavaScript is off.</b> This dashboard needs JavaScript to show numbers and charts. Some file previews (for example the iPhone file viewer) don't run it — open the file in a full browser instead.</div></noscript>
+
+  <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>First-pass yield by day</h2>
+      <div class="desc">Share of serials passing on their first attempt · dashed line = target</div>
+      <div class="chart" id="c-fpy"></div>
+    </div>
+    <div class="card">
+      <h2>Units tested by day</h2>
+      <div class="desc">Unique serials with at least one test that day</div>
+      <div class="chart" id="c-vol"></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Failure Pareto</h2>
+      <div class="desc">Failed test attempts by failure code</div>
+      <div class="chart" id="c-pareto"></div>
+    </div>
+    <div class="card">
+      <h2>Stations</h2>
+      <div class="desc">Status compares station FPY with the target</div>
+      <div class="scroll" id="t-stations"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h2>Recent failures</h2>
+    <div class="desc">Latest 25 failed attempts in the current filter</div>
+    <div class="scroll" id="t-fails"></div>
+  </div>
+
+  <details>
+    <summary>CSV format</summary>
+    <p class="sub">One row per test attempt. Headers are matched case-insensitively; only <span class="mono">timestamp</span>, <span class="mono">serial</span> and <span class="mono">result</span> are required.</p>
+    <pre class="mono card">timestamp,serial,station,product,result,failure_code,cycle_time_s
+2026-10-15T08:12:03,MOD-000123,FMT-01,Module A,PASS,,74.2
+2026-10-15T08:13:40,MOD-000124,FMT-02,Module A,FAIL,Hi-pot,81.0</pre>
+    <p class="sub">Result accepts PASS/FAIL, P/F, OK/NG, 1/0 or true/false.</p>
+  </details>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const DAY = 86400000;
+  const state = { records: [], days: 7, station: "", product: "", target: 95, source: "Sample data" };
+
+  // ---------- data ----------
+  function sampleData() {
+    let seed = 42;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const stations = ["FMT-01", "FMT-02", "FMT-03", "FMT-04"];
+    const stationBias = { "FMT-01": 0, "FMT-02": 0.015, "FMT-03": 0.045, "FMT-04": 0.005 };
+    const products = ["Module A", "Module B"];
+    const codes = [
+      ["Insulation resistance", 30], ["Hi-pot", 22], ["Voltage out of range", 16],
+      ["Comms / BMS", 12], ["Leak test", 9], ["Torque check", 6], ["Label / visual", 5]
+    ];
+    const totalW = codes.reduce((a, c) => a + c[1], 0);
+    const pickCode = () => { let r = rnd() * totalW; for (const [c, w] of codes) { if ((r -= w) <= 0) return c; } return codes[0][0]; };
+    const out = [];
+    const end = new Date(); end.setMinutes(0, 0, 0);
+    const start = end.getTime() - 30 * DAY;
+    let sn = 100000;
+    for (let t = start; t < end.getTime(); t += DAY) {
+      const day = new Date(t);
+      const weekend = day.getDay() === 0 || day.getDay() === 6;
+      const n = Math.round((weekend ? 70 : 180) + rnd() * 40);
+      const dayDrift = Math.sin(t / DAY / 4) * 0.012;
+      for (let i = 0; i < n; i++) {
+        const station = stations[Math.floor(rnd() * stations.length)];
+        const product = rnd() < 0.65 ? products[0] : products[1];
+        const serial = "MOD-" + String(sn++).padStart(6, "0");
+        let ts = t + rnd() * DAY;
+        const failP = 0.035 + stationBias[station] + dayDrift + (product === products[1] ? 0.01 : 0);
+        let attempt = 0, passed = false;
+        while (!passed && attempt < 3) {
+          const fail = rnd() < (attempt === 0 ? failP : 0.3);
+          const ct = 68 + rnd() * 14 + (fail ? 6 : 0);
+          out.push({ ts, serial, station, product, pass: !fail, code: fail ? pickCode() : "", ct: Math.round(ct * 10) / 10 });
+          passed = !fail; attempt++;
+          ts += 600000 + rnd() * 3600000;
+        }
+      }
+    }
+    return out.filter(r => r.ts <= Date.now());
+  }
+
+  function parseCSV(text) {
+    const rows = []; let row = [], cell = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+        else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        row.push(cell); cell = "";
+        if (row.some(c => c.trim() !== "")) rows.push(row);
+        row = [];
+      } else cell += ch;
+    }
+    row.push(cell);
+    if (row.some(c => c.trim() !== "")) rows.push(row);
+    return rows;
+  }
+
+  const ALIASES = {
+    ts: ["timestamp", "time", "datetime", "date", "test_time", "start_time"],
+    serial: ["serial", "serial_number", "sn", "module_id", "module", "barcode", "unit"],
+    station: ["station", "tester", "line", "cell"],
+    product: ["product", "model", "part_number", "pn", "sku"],
+    pass: ["result", "status", "outcome", "pass_fail", "passfail"],
+    code: ["failure_code", "fail_code", "failure", "defect", "error", "error_code", "reason"],
+    ct: ["cycle_time_s", "cycle_time", "duration_s", "duration", "test_time_s"]
+  };
+  function toRecords(rows) {
+    if (rows.length < 2) throw new Error("CSV has no data rows.");
+    const head = rows[0].map(h => h.trim().toLowerCase().replace(/[\s-]+/g, "_"));
+    const idx = {};
+    for (const [k, names] of Object.entries(ALIASES)) idx[k] = head.findIndex(h => names.includes(h));
+    for (const k of ["ts", "serial", "pass"]) if (idx[k] < 0) throw new Error(`Missing required column: ${ALIASES[k][0]}`);
+    const out = []; let skipped = 0;
+    for (const r of rows.slice(1)) {
+      const get = (k) => idx[k] >= 0 ? (r[idx[k]] ?? "").trim() : "";
+      const ts = Date.parse(get("ts"));
+      const res = get("pass").toLowerCase();
+      const pass = ["pass", "p", "ok", "1", "true", "passed", "good"].includes(res);
+      const fail = ["fail", "f", "ng", "0", "false", "failed", "bad"].includes(res);
+      if (isNaN(ts) || !get("serial") || (!pass && !fail)) { skipped++; continue; }
+      const ct = parseFloat(get("ct"));
+      out.push({ ts, serial: get("serial"), station: get("station") || "—", product: get("product") || "—",
+        pass, code: pass ? "" : (get("code") || "Unspecified"), ct: isNaN(ct) ? null : ct });
+    }
+    if (!out.length) throw new Error("No valid rows found.");
+    return { out, skipped };
+  }
+
+  // ---------- filtering & metrics ----------
+  function filtered() {
+    const max = state.records.reduce((m, r) => Math.max(m, r.ts), 0);
+    const from = state.days ? max - state.days * DAY : -Infinity;
+    return state.records.filter(r => r.ts > from
+      && (!state.station || r.station === state.station)
+      && (!state.product || r.product === state.product));
+  }
+
+  // Groups attempts by serial (chronological) → first/last result.
+  function bySerial(recs) {
+    const m = new Map();
+    for (const r of recs) { let a = m.get(r.serial); if (!a) m.set(r.serial, a = []); a.push(r); }
+    for (const a of m.values()) a.sort((x, y) => x.ts - y.ts);
+    return m;
+  }
+  function yields(recs) {
+    const m = bySerial(recs); let first = 0, final = 0;
+    for (const a of m.values()) { if (a[0].pass) first++; if (a[a.length - 1].pass) final++; }
+    return { units: m.size, fpy: m.size ? first / m.size : NaN, final: m.size ? final / m.size : NaN, map: m };
+  }
+  const dayKey = (ts) => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+
+  // ---------- formatting ----------
+  const pct = (v, d = 1) => isNaN(v) ? "—" : (v * 100).toFixed(d) + "%";
+  const int = (v) => v.toLocaleString();
+  const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const fmtTime = (t) => new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function status(fpy) {
+    const t = state.target / 100;
+    if (isNaN(fpy)) return { key: "none", label: "No data", color: "var(--text-muted)", icon: "–" };
+    if (fpy >= t) return { key: "good", label: "On target", color: "var(--good)", icon: "✓" };
+    if (fpy >= t - 0.02) return { key: "warning", label: "Below target", color: "var(--warning)", icon: "!" };
+    return { key: "critical", label: "Off target", color: "var(--critical)", icon: "✕" };
+  }
+
+  // ---------- SVG helpers ----------
+  const NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs = {}, parent) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function niceTicks(lo, hi, n = 4) {
+    const span = hi - lo || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => s >= step0);
+    const ticks = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) ticks.push(+v.toFixed(10));
+    return ticks;
+  }
+  function setupChart(host, H = 220) {
+    host.innerHTML = "";
+    const W = Math.max(300, host.clientWidth || 500);
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img" }, host);
+    const tip = document.createElement("div"); tip.className = "tip"; host.appendChild(tip);
+    const show = (html, x, y) => {
+      tip.innerHTML = html; tip.style.opacity = 1;
+      const scale = host.clientWidth / W, tw = tip.offsetWidth;
+      let left = x * scale + 12; if (left + tw > host.clientWidth) left = x * scale - tw - 12;
+      tip.style.left = Math.max(0, left) + "px"; tip.style.top = Math.max(0, y * scale - 10) + "px";
+    };
+    const hide = () => { tip.style.opacity = 0; };
+    return { svg, W, H, show, hide };
+  }
+  function emptyChart(host, msg = "No data in this filter") { host.innerHTML = `<div class="empty">${msg}</div>`; }
+
+  // ---------- charts ----------
+  function drawFPY(daily) {
+    const host = $("#c-fpy");
+    const pts = daily.filter(d => !isNaN(d.fpy));
+    if (!pts.length) return emptyChart(host);
+    const { svg, W, H, show, hide } = setupChart(host);
+    svg.setAttribute("aria-label", "First-pass yield by day line chart");
+    const m = { l: 44, r: 12, t: 10, b: 24 };
+    const t = state.target / 100;
+    const lo = Math.max(0, Math.floor(Math.min(t, ...pts.map(d => d.fpy)) * 100 - 2) / 100);
+    const hi = 1;
+    const x = (i) => m.l + (pts.length === 1 ? (W - m.l - m.r) / 2 : i * (W - m.l - m.r) / (pts.length - 1));
+    const y = (v) => m.t + (hi - v) / (hi - lo) * (H - m.t - m.b);
+    const ax = el("g", { class: "axis" }, svg);
+    for (const v of niceTicks(lo, hi, 4)) {
+      el("line", { class: "gridline", x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }, ax);
+      el("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, ax).textContent = +(v * 100).toFixed(1) + "%";
+    }
+    const every = Math.ceil(pts.length / Math.max(2, Math.floor((W - m.l) / 70)));
+    pts.forEach((d, i) => { if (i % every === 0) el("text", { x: x(i), y: H - 6, "text-anchor": "middle" }, ax).textContent = fmtDay(d.day); });
+    el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: "var(--target)", "stroke-width": 1.5, "stroke-dasharray": "5 4" }, svg);
+    el("text", { x: m.l + 4, y: y(t) - 5, "text-anchor": "start", fill: "var(--text-secondary)", "font-size": 11 }, svg).textContent = `Target ${state.target}%`;
+    el("path", { d: pts.map((d, i) => (i ? "L" : "M") + x(i) + " " + y(d.fpy)).join(""), fill: "none", stroke: "var(--series-1)", "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+    const last = pts[pts.length - 1];
+    el("circle", { cx: x(pts.length - 1), cy: y(last.fpy), r: 4, fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 2 }, svg);
+    const cross = el("line", { y1: m.t, y2: H - m.b, stroke: "var(--text-muted)", "stroke-width": 1, opacity: 0 }, svg);
+    const dot = el("circle", { r: 5, fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 2, opacity: 0 }, svg);
+    const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", (e) => {
+      const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * W / r.width;
+      const i = Math.max(0, Math.min(pts.length - 1, Math.round((px - m.l) / ((W - m.l - m.r) / Math.max(1, pts.length - 1)))));
+      const d = pts[i];
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", 1);
+      dot.setAttribute("cx", x(i)); dot.setAttribute("cy", y(d.fpy)); dot.setAttribute("opacity", 1);
+      const s = status(d.fpy);
+      show(`<div class="muted">${fmtDay(d.day)}</div>FPY <b>${pct(d.fpy)}</b> <span class="muted">${s.icon} ${s.label}</span><br><span class="muted">${int(d.units)} units</span>`, x(i), y(d.fpy));
+    });
+    hit.addEventListener("pointerleave", () => { hide(); cross.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); });
+  }
+
+  function drawVolume(daily) {
+    const host = $("#c-vol");
+    if (!daily.length) return emptyChart(host);
+    const { svg, W, H, show, hide } = setupChart(host);
+    svg.setAttribute("aria-label", "Units tested by day bar chart");
+    const m = { l: 44, r: 12, t: 10, b: 24 };
+    const max = Math.max(...daily.map(d => d.units)) || 1;
+    const ticks = niceTicks(0, max, 4); const top = Math.max(max, ticks[ticks.length - 1]);
+    const bw = (W - m.l - m.r) / daily.length;
+    const y = (v) => m.t + (1 - v / top) * (H - m.t - m.b);
+    const ax = el("g", { class: "axis" }, svg);
+    for (const v of ticks) {
+      el("line", { class: "gridline", x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }, ax);
+      el("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, ax).textContent = int(v);
+    }
+    const every = Math.ceil(daily.length / Math.max(2, Math.floor((W - m.l) / 70)));
+    daily.forEach((d, i) => {
+      const cx = m.l + i * bw + bw / 2;
+      if (i % every === 0) el("text", { x: cx, y: H - 6, "text-anchor": "middle" }, ax).textContent = fmtDay(d.day);
+      const w = Math.max(2, Math.min(28, bw - 2)), h = Math.max(0, H - m.b - y(d.units)), r = Math.min(4, w / 2, h);
+      const x0 = cx - w / 2, y0 = y(d.units), yb = H - m.b;
+      const bar = el("path", { d: `M${x0} ${yb}V${y0 + r}Q${x0} ${y0} ${x0 + r} ${y0}H${x0 + w - r}Q${x0 + w} ${y0} ${x0 + w} ${y0 + r}V${yb}Z`, fill: "var(--series-1)" }, svg);
+      const hit = el("rect", { x: m.l + i * bw, y: m.t, width: bw, height: H - m.t - m.b, fill: "transparent" }, svg);
+      hit.addEventListener("pointerenter", () => { bar.setAttribute("opacity", .75); show(`<div class="muted">${fmtDay(d.day)}</div><b>${int(d.units)}</b> units · <b>${int(d.attempts)}</b> attempts`, cx, y0); });
+      hit.addEventListener("pointerleave", () => { bar.setAttribute("opacity", 1); hide(); });
+    });
+  }
+
+  function drawPareto(recs) {
+    const host = $("#c-pareto");
+    const counts = new Map();
+    for (const r of recs) if (!r.pass) counts.set(r.code, (counts.get(r.code) || 0) + 1);
+    let rows = [...counts].sort((a, b) => b[1] - a[1]);
+    if (!rows.length) return emptyChart(host, "No failures in this filter");
+    if (rows.length > 8) { const rest = rows.slice(7).reduce((a, r) => a + r[1], 0); rows = rows.slice(0, 7).concat([["Other", rest]]); }
+    const total = rows.reduce((a, r) => a + r[1], 0);
+    const rowH = 28, H = rows.length * rowH + 8;
+    const { svg, W, show, hide } = setupChart(host, H);
+    svg.setAttribute("aria-label", "Failure Pareto bar chart");
+    const labelW = Math.min(170, W * 0.38), valW = 92;
+    const max = rows[0][1], bwMax = W - labelW - valW;
+    let cum = 0;
+    rows.forEach(([code, n], i) => {
+      cum += n;
+      const yc = 4 + i * rowH + rowH / 2, w = Math.max(3, n / max * bwMax), h = 16, r = Math.min(4, w / 2);
+      const x0 = labelW, y0 = yc - h / 2;
+      el("text", { x: labelW - 8, y: yc + 4, "text-anchor": "end", fill: "var(--text-primary)", "font-size": 12 }, svg).textContent = code.length > 24 ? code.slice(0, 23) + "…" : code;
+      const bar = el("path", { d: `M${x0} ${y0}H${x0 + w - r}Q${x0 + w} ${y0} ${x0 + w} ${y0 + r}V${y0 + h - r}Q${x0 + w} ${y0 + h} ${x0 + w - r} ${y0 + h}H${x0}Z`, fill: "var(--series-1)" }, svg);
+      el("text", { x: x0 + w + 6, y: yc + 4, fill: "var(--text-secondary)", "font-size": 12 }, svg).textContent = `${int(n)} · ${pct(n / total, 0)}`;
+      const c = cum;
+      const hit = el("rect", { x: 0, y: yc - rowH / 2, width: W, height: rowH, fill: "transparent" }, svg);
+      hit.addEventListener("pointerenter", () => { bar.setAttribute("opacity", .75); show(`<b>${esc(code)}</b><br>${int(n)} failures (${pct(n / total)})<br><span class="muted">Cumulative ${pct(c / total)}</span>`, x0 + w, y0); });
+      hit.addEventListener("pointerleave", () => { bar.setAttribute("opacity", 1); hide(); });
+    });
+  }
+
+  // ---------- tables & tiles ----------
+  function renderKPIs(recs, y) {
+    const fails = recs.filter(r => !r.pass).length;
+    const cts = recs.map(r => r.ct).filter(v => v != null);
+    const avgCt = cts.length ? cts.reduce((a, b) => a + b, 0) / cts.length : NaN;
+    const retests = recs.length - y.units;
+    const s = status(y.fpy);
+    const tiles = [
+      ["Units tested", int(y.units), `${int(recs.length)} attempts`],
+      ["First-pass yield", pct(y.fpy), `<span class="badge"><span class="dot" style="background:${s.color}"></span>${s.icon} ${s.label} (${state.target}%)</span>`],
+      ["Final yield", pct(y.final), "after retests"],
+      ["Failed attempts", int(fails), recs.length ? pct(fails / recs.length) + " of attempts" : ""],
+      ["Retests", int(retests), y.units ? (retests / y.units).toFixed(2) + " per unit" : ""],
+      ["Avg cycle time", isNaN(avgCt) ? "—" : avgCt.toFixed(1) + " s", cts.length ? "per attempt" : "no cycle-time column"]
+    ];
+    $("#kpis").innerHTML = tiles.map(([l, v, n]) => `<div class="card kpi"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
+  }
+
+  function renderStations(recs) {
+    const groups = new Map();
+    for (const r of recs) { let g = groups.get(r.station); if (!g) groups.set(r.station, g = []); g.push(r); }
+    if (!groups.size) return $("#t-stations").innerHTML = `<div class="empty">No data</div>`;
+    const rows = [...groups].map(([st, g]) => {
+      const y = yields(g), cts = g.map(r => r.ct).filter(v => v != null);
+      return { st, units: y.units, attempts: g.length, fpy: y.fpy, final: y.final, ct: cts.length ? cts.reduce((a, b) => a + b, 0) / cts.length : NaN, last: Math.max(...g.map(r => r.ts)) };
+    }).sort((a, b) => a.st.localeCompare(b.st));
+    $("#t-stations").innerHTML = `<table><thead><tr><th>Station</th><th class="num">Units</th><th class="num">FPY</th><th class="num">Final</th><th class="num">Cycle</th><th>Status</th><th>Last test</th></tr></thead><tbody>${
+      rows.map(r => { const s = status(r.fpy); return `<tr><td>${esc(r.st)}</td><td class="num">${int(r.units)}</td><td class="num">${pct(r.fpy)}</td><td class="num">${pct(r.final)}</td><td class="num">${isNaN(r.ct) ? "—" : r.ct.toFixed(1) + " s"}</td><td><span class="badge"><span class="dot" style="background:${s.color}"></span>${s.icon} ${s.label}</span></td><td>${fmtTime(r.last)}</td></tr>`; }).join("")
+    }</tbody></table>`;
+  }
+
+  function renderFails(recs, map) {
+    const fails = recs.filter(r => !r.pass).sort((a, b) => b.ts - a.ts).slice(0, 25);
+    if (!fails.length) return $("#t-fails").innerHTML = `<div class="empty">No failures in this filter</div>`;
+    $("#t-fails").innerHTML = `<table><thead><tr><th>Time</th><th>Serial</th><th>Station</th><th>Product</th><th>Failure code</th><th>Attempt</th><th>Final outcome</th></tr></thead><tbody>${
+      fails.map(r => {
+        const a = map.get(r.serial) || [r], n = a.indexOf(r) + 1, lastPass = a[a.length - 1].pass;
+        return `<tr><td>${fmtTime(r.ts)}</td><td class="mono">${esc(r.serial)}</td><td>${esc(r.station)}</td><td>${esc(r.product)}</td><td>${esc(r.code)}</td><td class="num">${n} of ${a.length}</td><td>${lastPass ? '<span class="pass">✓ Passed on retest</span>' : '<span class="fail">✕ Not passed</span>'}</td></tr>`;
+      }).join("")
+    }</tbody></table>`;
+  }
+
+  function fillSelect(sel, values, current, allLabel) {
+    sel.innerHTML = `<option value="">${allLabel}</option>` + values.map(v => `<option${v === current ? " selected" : ""}>${esc(v)}</option>`).join("");
+  }
+
+  // ---------- render ----------
+  function render() {
+    const recs = filtered();
+    const y = yields(recs);
+    const days = new Map();
+    for (const r of recs) { const k = dayKey(r.ts); let a = days.get(k); if (!a) days.set(k, a = []); a.push(r); }
+    // FPY per day is attributed to the day of each serial's first attempt.
+    const firstDay = new Map();
+    for (const [sn, a] of y.map) { const k = dayKey(a[0].ts); let d = firstDay.get(k); if (!d) firstDay.set(k, d = { n: 0, p: 0 }); d.n++; if (a[0].pass) d.p++; }
+    const daily = [...days].sort((a, b) => a[0] - b[0]).map(([day, a]) => {
+      const f = firstDay.get(day);
+      return { day, units: new Set(a.map(r => r.serial)).size, attempts: a.length, fpy: f ? f.p / f.n : NaN };
+    });
+    renderKPIs(recs, y);
+    drawFPY(daily);
+    drawVolume(daily);
+    drawPareto(recs);
+    renderStations(recs);
+    renderFails(recs, y.map);
+    $("#source").textContent = state.source;
+    $("#range-label").textContent = recs.length ? `${fmtTime(Math.min(...recs.map(r => r.ts)))} – ${fmtTime(Math.max(...recs.map(r => r.ts)))}` : "";
+  }
+
+  function setRecords(recs, source) {
+    state.records = recs; state.source = source; state.station = ""; state.product = "";
+    const uniq = (k) => [...new Set(recs.map(r => r[k]))].sort();
+    fillSelect($("#f-station"), uniq("station"), "", "All stations");
+    fillSelect($("#f-product"), uniq("product"), "", "All products");
+    render();
+  }
+
+  function loadFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const { out, skipped } = toRecords(parseCSV(String(reader.result)));
+        setRecords(out, `${file.name} · ${int(out.length)} attempts${skipped ? ` · ${int(skipped)} rows skipped` : ""}`);
+      } catch (e) { alert("Could not load CSV: " + e.message); }
+    };
+    reader.readAsText(file);
+  }
+
+  function exportCSV() {
+    const q = (v) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+    const lines = ["timestamp,serial,station,product,result,failure_code,cycle_time_s"].concat(
+      filtered().sort((a, b) => a.ts - b.ts).map(r => [new Date(r.ts).toISOString(), r.serial, r.station, r.product, r.pass ? "PASS" : "FAIL", r.code, r.ct ?? ""].map(v => q(String(v))).join(",")));
+    const csv = lines.join("\n");
+    // Inside the claude.ai viewer, downloads go through its save prompt; opened as a local file, use a plain link.
+    if (downloads) {
+      downloads.save({ filename: "fmt-filtered.csv", data: csv }).catch((e) => {
+        if (e && e.code !== "declined") alert("Export failed: " + (e.message || e.code));
+      });
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "fmt-filtered.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  let downloads = null;
+  if (window.claude && window.claude.use) window.claude.use("downloads").then((d) => { downloads = d; }, () => {});
+
+  // ---------- wiring ----------
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  const savedTarget = parseFloat(store.get("fmt.target"));
+  if (!isNaN(savedTarget)) { state.target = savedTarget; $("#f-target").value = savedTarget; }
+  const savedTheme = store.get("fmt.theme");
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+
+  $("#range").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.days = +b.dataset.days;
+    for (const x of $("#range").children) x.setAttribute("aria-pressed", x === b);
+    render();
+  });
+  $("#f-station").addEventListener("change", (e) => { state.station = e.target.value; render(); });
+  $("#f-product").addEventListener("change", (e) => { state.product = e.target.value; render(); });
+  $("#f-target").addEventListener("change", (e) => {
+    const v = parseFloat(e.target.value); if (isNaN(v)) return;
+    state.target = Math.min(100, Math.max(0, v)); store.set("fmt.target", state.target); render();
+  });
+  $("#btn-load").addEventListener("click", () => $("#file").click());
+  $("#file").addEventListener("change", (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ""; });
+  $("#btn-sample").addEventListener("click", () => setRecords(sampleData(), "Sample data"));
+  $("#btn-export").addEventListener("click", exportCSV);
+  $("#btn-theme").addEventListener("click", () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark"; store.set("fmt.theme", root.dataset.theme);
+  });
+  const app = $("#app");
+  app.addEventListener("dragover", (e) => { e.preventDefault(); app.classList.add("drop"); });
+  app.addEventListener("dragleave", (e) => { if (e.target === app) app.classList.remove("drop"); });
+  app.addEventListener("drop", (e) => { e.preventDefault(); app.classList.remove("drop"); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+  let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 150); });
+
+  setRecords(sampleData(), "Sample data");
+})();
+</script>
+</body>
+</html>
